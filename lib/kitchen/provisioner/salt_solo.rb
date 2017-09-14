@@ -18,9 +18,11 @@
 
 require 'kitchen/provisioner/base'
 require 'kitchen-salt/util'
+require 'kitchen-salt/mine'
 require 'kitchen-salt/pillars'
 require 'kitchen-salt/states'
 require 'fileutils'
+require 'json'
 require 'yaml'
 
 module Kitchen
@@ -31,6 +33,7 @@ module Kitchen
 
     class SaltSolo < Base
       include Kitchen::Salt::Util
+      include Kitchen::Salt::Mine
       include Kitchen::Salt::Pillars
       include Kitchen::Salt::States
 
@@ -163,6 +166,40 @@ module Kitchen
         cmd += <<-INSTALL
           #{config[:init_environment]}
         INSTALL
+        cmd
+      end
+
+      def prepare_command
+        # TODO(ppg): make work on windows
+        # TODO(ppg): make work with old return codes
+        data = get_mine_data
+        puts "data: #{data.inspect}"
+
+        #data.each do |machine, funcs|
+				#	#old = __salt__['data.get']('mine_cache')
+				#	#if isinstance(old, dict):
+				#	#		old.update(data)
+				#	#		data = old
+				#	#return __salt__['data.update']('mine_cache', data)
+        #  # TODO(ppg): support sending mine
+        #  funcs.each do |func, config|
+        #    # TODO(ppg): generate a better error message if the mine entry is misformatted
+        #    cmds << sudo("salt-call --local mine.send #{func} #{config.args} #{config.kwargs}")
+
+        #  end
+        #end
+
+
+
+
+        ## Flush the mine and then update with new data
+        #cmds = []
+        #cmds << sudo("salt-call --local mine.flush")
+        #cmds.join("\n")
+
+        # Update the mine_cache with the new data
+        cmd = sudo("salt-call --local --config-dir=/tmp/kitchen/etc/salt data.update mine_cache '#{JSON.generate(data)}'")
+        puts "cmd: #{cmd}"
         cmd
       end
 
