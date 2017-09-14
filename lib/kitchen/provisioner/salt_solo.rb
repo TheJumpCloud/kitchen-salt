@@ -18,6 +18,7 @@
 
 require 'fileutils'
 require 'hashie'
+require 'kitchen-salt/mine'
 require 'kitchen-salt/pillars'
 require 'kitchen-salt/states'
 require 'kitchen-salt/util'
@@ -32,6 +33,7 @@ module Kitchen
 
     class SaltSolo < Base
       include Kitchen::Salt::Util
+      include Kitchen::Salt::Mine
       include Kitchen::Salt::Pillars
       include Kitchen::Salt::States
 
@@ -262,6 +264,22 @@ module Kitchen
         else
            File.join(*args)
         end
+      end
+
+      def prepare_command
+        # TODO(ppg): make work on windows
+        data = get_mine_data
+
+        # data has format of
+        #
+        #   func1:
+        #     func1_data
+        #   func2:
+        #     func2_data
+        #
+        # TODO(ppg): would like to support top-level keys of machines, but unclear how to send below
+        # Update the mine_cache with the new data
+        sudo("salt-call --local --config-dir=/tmp/kitchen/etc/salt data.update mine_cache '#{JSON.generate(data)}'")
       end
 
       def salt_command
