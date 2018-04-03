@@ -280,7 +280,8 @@ module Kitchen
         #   func2:
         #     func2_data
         #
-        # TODO(ppg): would like to support top-level keys of machines, but unclear how to send below
+        # TODO(ppg): would like to support top-level keys of machines, but salt doesn't support that with --local option:
+        # https://github.com/saltstack/salt/blob/ec973104afd2a7b68460f3a48258315ba5dd948d/salt/modules/mine.py#L289-L305
         # Update the mine_cache with the new data
         sudo("salt-call --local --config-dir=/tmp/kitchen/etc/salt data.update mine_cache '#{JSON.generate(data)}'")
       end

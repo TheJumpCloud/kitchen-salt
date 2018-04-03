@@ -51,6 +51,9 @@ def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, v
     d = remote_functions_data[tgt]
     if fun not in d:
         raise SaltInvocationError(message='Cannot find target {} with function {} in remote functions.'.format(tgt, fun))
-    # TODO(ppg): allow lookup based on arg too
     d = d[fun]
+    if 'ret' not in d:
+        raise SaltInvocationError(message="target {} function {} is missing 'ret' field".format(tgt, fun))
+    # TODO(ppg): allow lookup based on arg too
+    d = d['ret']
     return { tgt: d }
