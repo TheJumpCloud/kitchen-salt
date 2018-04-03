@@ -1,0 +1,2 @@
+mock-mine:
+  mock.mine

@@ -18,7 +18,7 @@
 
 require 'fileutils'
 require 'hashie'
-require 'kitchen-salt/mine'
+require 'kitchen-salt/mock'
 require 'kitchen-salt/pillars'
 require 'kitchen-salt/states'
 require 'kitchen-salt/util'
@@ -33,7 +33,7 @@ module Kitchen
 
     class SaltSolo < Base
       include Kitchen::Salt::Util
-      include Kitchen::Salt::Mine
+      include Kitchen::Salt::Mock
       include Kitchen::Salt::Pillars
       include Kitchen::Salt::States
 
@@ -62,6 +62,8 @@ module Kitchen
         salt_copy_filter: [],
         salt_env: 'base',
         salt_file_root: '/srv/salt',
+        salt_mock_mine_root: '/srv/mine',
+        salt_mock_remote_functions_root: '/srv/remote_functions',
         salt_force_color: false,
         salt_install: 'bootstrap',
         salt_minion_config_dropin_files: [],
@@ -195,6 +197,7 @@ module Kitchen
         prepare_data
         prepare_install
         prepare_minion
+        prepare_mock
         prepare_pillars
         prepare_grains
         prepare_states
@@ -252,7 +255,7 @@ module Kitchen
 
       def prepare_command
         # TODO(ppg): make work on windows
-        data = get_mine_data
+        data = get_mock_mine_data
 
         # data has format of
         #
