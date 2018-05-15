@@ -2,6 +2,7 @@ from __future__ import absolute_import
 import ast
 import glob
 import yaml
+import salt.utils.args
 
 import logging
 
@@ -46,6 +47,16 @@ def remote_functions(name):
 def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, via_master=None, expr_form=None):
     global remote_functions_data
     log.info('MOCK: Publishing {0!r} for {1}'.format(fun, tgt))
+    kwargs = salt.utils.args.yamlify_arg(arg)
+
+    # Special case some functions for convinient usage
+    # TODO(ppg): allow custom python files provided to override a function
+    #   mock_remote_functions:
+    #     'x509.sign_remote_certificate': mock_sign_remote_certificate.py
+    if fun == 'x509.sign_remote_certificate':
+        kwargs['text'] = True
+        return { tgt: mock_sign_remote_certificate(**kwargs) }
+
     if tgt not in remote_functions_data:
         raise SaltInvocationError(message='Cannot find target {} in remote functions.'.format(tgt))
     d = remote_functions_data[tgt]
@@ -57,3 +68,6 @@ def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, v
     # TODO(ppg): allow lookup based on arg too
     d = d['ret']
     return { tgt: d }
+
+def mock_sign_remote_certificate(**kwargs):
+    return __salt__['x509.create_certificate'](**kwargs)

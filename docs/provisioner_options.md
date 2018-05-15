@@ -350,32 +350,39 @@ minion targets followed by the function and return data.
 
 ##### `remote_functions.example` file
       centos-7.vagrantup.com:
-        x509.sign_remote_certificate:
-          ret: |
-            -----BEGIN CERTIFICATE-----
-            MIIEADCCAuigAwIBAgIBADANBgkqhkiG9w0BAQUFADBjMQswCQYDVQQGEwJVUzEh
-            MB8GA1UEChMYVGhlIEdvIERhZGR5IEdyb3VwLCBJbmMuMTEwLwYDVQQLEyhHbyBE
-            YWRkeSBDbGFzcyAyIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MB4XDTA0MDYyOTE3
-            MDYyMFoXDTM0MDYyOTE3MDYyMFowYzELMAkGA1UEBhMCVVMxITAfBgNVBAoTGFRo
-            ZSBHbyBEYWRkeSBHcm91cCwgSW5jLjExMC8GA1UECxMoR28gRGFkZHkgQ2xhc3Mg
-            MiBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTCCASAwDQYJKoZIhvcNAQEBBQADggEN
-            ADCCAQgCggEBAN6d1+pXGEmhW+vXX0iG6r7d/+TvZxz0ZWizV3GgXne77ZtJ6XCA
-            PVYYYwhv2vLM0D9/AlQiVBDYsoHUwHU9S3/Hd8M+eKsaA7Ugay9qK7HFiH7Eux6w
-            wdhFJ2+qN1j3hybX2C32qRe3H3I2TqYXP2WYktsqbl2i/ojgC95/5Y0V4evLOtXi
-            EqITLdiOr18SPaAIBQi2XKVlOARFmR6jYGB0xUGlcmIbYsUfb18aQr4CUWWoriMY
-            avx4A6lNf4DD+qta/KFApMoZFv6yyO9ecw3ud72a9nmYvLEHZ6IVDd2gWMZEewo+
-            YihfukEHU1jPEX44dMX4/7VpkI+EdOqXG68CAQOjgcAwgb0wHQYDVR0OBBYEFNLE
-            sNKR1EwRcbNhyz2h/t2oatTjMIGNBgNVHSMEgYUwgYKAFNLEsNKR1EwRcbNhyz2h
-            /t2oatTjoWekZTBjMQswCQYDVQQGEwJVUzEhMB8GA1UEChMYVGhlIEdvIERhZGR5
-            IEdyb3VwLCBJbmMuMTEwLwYDVQQLEyhHbyBEYWRkeSBDbGFzcyAyIENlcnRpZmlj
-            YXRpb24gQXV0aG9yaXR5ggEAMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQEFBQAD
-            ggEBADJL87LKPpH8EsahB4yOd6AzBhRckB4Y9wimPQoZ+YeAEW5p5JYXMP80kWNy
-            OO7MHAGjHZQopDH2esRU1/blMVgDoszOYtuURXO1v0XJJLXVggKtI3lpjbi2Tc7P
-            TMozI+gciKqdi0FuFskg5YmezTvacPd+mSYgFFQlq25zheabIZ0KbIIOqPjCDPoQ
-            HmyW74cNxA9hi63ugyuV+I6ShHI56yDqg+2DzZduCLzrTia2cyvk0/ZM/iZx4mER
-            dEr/VxqHD3VILs9RaRegAhJhldXRQLIQTO7ErBBDpqWeCtWVYpoNz4iCxTIM5Cuf
-            ReYNnyicsbkqWletNw+vHX/bvZ8=
-            -----END CERTIFICATE-----
+        network.ip_addrs
+          ret:
+            - 1.2.3.4
+
+##### Special Cases
+
+###### `x509.sign_remote_certificate`
+
+Because signing a remote certificate requires the generate certificate
+to match the key provided as well as to be generated from a known CA
+this method is a special case. It will be intercepted by a method that
+will essentailly call `x509.create_certificate` on the local machine.
+This means that the pillar must configure the following information:
+
+      x509_signing_policies:
+        sample_policy:
+          signing_private_key: /etc/pki/sample/ca.key
+          signing_cert: /etc/pki/sample/ca.crt
+          O: Widgets Co
+          OU: Infrastructure
+          C: US
+          ST: Wisconsin
+          L: Madison
+          Email: bucky@uw.edu
+          basicConstraints: "critical CA:false"
+          subjectKeyIdentifier: hash
+          authorityKeyIdentifier: keyid,issuer:always
+          days_valid: 365
+
+*NOTE: the caller of the state `x509.sign_remote_certificate` will
+specify a siging_policy that must match `sample_policy` above. In
+addition the callee is responsible for laying down the
+`signing_private_key` and `signing_cert`.*
 
 
 ## Install Salt ##
