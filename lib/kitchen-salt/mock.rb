@@ -20,6 +20,8 @@ module Kitchen
       end
 
       def prepare_mine
+        return unless config[:mock_mine]
+
         info("Preparing mine into #{config[:salt_mock_mine_root]}")
         subdir_path = File.join(sandbox_path, config[:salt_mock_mine_root])
         FileUtils.mkdir_p(subdir_path)
@@ -29,6 +31,8 @@ module Kitchen
       end
 
       def prepare_remote_functions
+        return unless config[:mock_remote_functions
+        ]
         info("Preparing remote_functions into #{config[:salt_mock_remote_functions_root]}")
         subdir_path = File.join(sandbox_path, config[:salt_mock_remote_functions_root])
         FileUtils.mkdir_p(subdir_path)
@@ -39,6 +43,7 @@ module Kitchen
 
       def get_mock_mine_data
         return unless config[:mock_mine]
+
         info("Collecting mock mine data from #{config[:mock_mine]}")
         YAML.load_file(config[:mock_mine])
       end
