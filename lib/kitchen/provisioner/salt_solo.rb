@@ -18,6 +18,7 @@
 
 require 'fileutils'
 require 'hashie'
+require 'json'
 require 'kitchen-salt/mock'
 require 'kitchen-salt/pillars'
 require 'kitchen-salt/states'
