@@ -17,7 +17,8 @@ rvm:
 env:
   matrix:
     - SUITE=centos
-    - SUITE=ubuntu
+    - SUITE=ubuntu-16
+    - SUITE=ubuntu-18
     - SUITE=debian
 
 sudo: true
@@ -26,10 +27,13 @@ bundler_args: --with=docker --without vagrant windows
 
 before_install:
   - pip install --user -r test-requirements.txt
+  - mkdir -p gpgkeys
+  - gpg --no-default-keyring --homedir gpgkeys --import < tests/gpgkeys/test.txt
 
 script:
   # Check shell scripts
   - shellcheck lib/kitchen/provisioner/*.sh*
+  - shellcheck assets/*.sh*
   # Run test-kitchen with docker driver:
   - bundle exec rake "integration:verify[$SUITE]"
 
