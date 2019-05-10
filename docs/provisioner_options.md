@@ -416,7 +416,7 @@ This is also used to verify that the correct version of salt was installed befor
 
 default: `https://bootstrap.saltstack.com`
 
-Location of the bootstrap script. This can also be a file located locally.
+Location of the bootstrap script. This can also be a file located locally. If running a local file, `install_after_init_environment` must be set to `true`.
 
 For Windows, use the [powershell script](https://github.com/saltstack/salt-bootstrap/blob/develop/bootstrap-salt.ps1)
 
@@ -437,18 +437,20 @@ Details on the various options available at the [salt-bootstrap](https://docs.sa
 
 For the Windows Powershell script:
 
-    platform:
+    platforms:
       - name: windows
-        salt_bootstrap_script: https://github.com/saltstack/salt-bootstrap/blob/develop/bootstrap-salt.ps1
-        salt_bootstrap_options: -version 2017.7.2
+        provisioner:
+          salt_bootstrap_script: https://github.com/saltstack/salt-bootstrap/blob/develop/bootstrap-salt.ps1
+          salt_bootstrap_options: -version 2017.7.2
 
 You can also use `%s` in any part of this, to replace with the version of salt, as specified by `salt_version`
 
 For example, below is a custom bootstrap option for centos6 requiring python2.7, here `%s` gets replaced by `2018.3`
 
-    platform:
+    platforms:
       - centos-6:
-        salt_bootstrap_options: "-P -p git -p curl -p sudo -y -x python2.7 git %s"
+        provisioner:
+          salt_bootstrap_options: "-P -p git -p curl -p sudo -y -x python2.7 git %s"
 
     suites:
       - name: oxygen
@@ -529,6 +531,18 @@ pip binary in the `$PATH` or path to a pip binary to use for installing salt.
 
 ## Extra Config Options ##
 
+### gpg_home ###
+
+default: `~/.gnupg/`
+
+Directory that the gnupg keyring is located.
+
+### gpg_key ###
+
+default: `nil`
+
+Identifier for the gpg key to transfer to the test instance.  Email or key id will work.
+
 ### init_environment ###
 
 default: `""`
@@ -549,7 +563,7 @@ A bootstrap script used to provide Ruby (`ruby` and `ruby-dev`) required for the
 
 ### chef_bootstrap_url ###
 
-default: `https://www.getchef.com/chef/install.sh`
+default: `https://www.chef.io/chef/install.sh`
 
 The chef bootstrap installer, used to provide Ruby for the serverspec test runner on the guest OS.
 
@@ -558,6 +572,19 @@ The chef bootstrap installer, used to provide Ruby for the serverspec test runne
 default: `true`
 
 Install chef.  This is required by the busser to run tests, if no verification driver is specified in the `.kitchen.yml`
+
+### run_salt_call ###
+
+default: `true`
+
+If `false` bypassed the `salt-call` command execution. For cases where the guest OS is already provisioned.
+
+### salt_call_command ###
+
+default for Windows: `c:\salt\salt-call.bat`
+default for others: `salt-call`
+
+Command used to invoke `salt-call`.
 
 ### salt_config ###
 

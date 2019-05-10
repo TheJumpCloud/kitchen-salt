@@ -6,7 +6,8 @@ driver:
   use_sudo: false
   socket: <%= ENV['DOCKER_HOST'] || 'unix:///var/run/docker.sock' %>
   provision_command:
-    - DEBIAN_FRONTEND=noninteractive apt-get install -y python-pip python-dev gcc git locales console-data
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y python-pip python-dev gcc git locales console-data gnupg
+    - mkdir -p /run/sshd
 provisioner:
   name: salt_solo
   salt_install: bootstrap
@@ -15,6 +16,10 @@ provisioner:
   salt_bootstrap_options: -X -p git -p curl -p sudo
   formula: tests
   require_chef: false
+  gpg_key: test@example.com
+  gpg_home: gpgkeys
+  cache_commands:
+    - touch %{sandbox_path}/srv/salt/cache_commands_test
   init_environment: |
     sudo mkdir -p /tmp/kitchen/var/cache/salt/master
   salt_copy_filter:
@@ -41,7 +46,7 @@ provisioner:
       source: https://github.com/salt-formulas/salt-formula-linux.git
     - name: git
       repo: git
-      source: https://github.com/salt-formulas/salt-formula-git.git
+      source: https://github.com/gtmanfred/salt-formula-git.git
     - name: postfix
       repo: git
       source: https://github.com/salt-formulas/salt-formula-postfix
@@ -58,31 +63,20 @@ provisioner:
       base:
         "*":
           - git
-    git.sls:
-      git:
-        client:
-          enabled: true
-          user:
-          - user:
-              name: jdoe
-              email: j@doe.com
-      linux:
-        system:
-          enabled: true
-          user:
-            jdoe:
-              enabled: true
-              sudo: true
-              full_name: John Doe
-              home: /home/jdoe
+          - gpgtest
+  pillars_from_directories:
+  - source:  tests/pillars/
+    dest: srv/pillar/
   grains:
     noservices: True
 
 platforms:
-  - name: ubuntu-14.04
+  - name: ubuntu-18.04
+    driver:
+      run_command: '/usr/sbin/sshd -D -o UseDNS=no -o UsePAM=no -o PasswordAuthentication=yes -o PidFile=/tmp/sshd.pid'
     provisioner:
-      salt_apt_repo: 'https://repo.saltstack.com/apt/ubuntu/14.04/amd64/'
-      salt_apt_repo_key: 'https://repo.saltstack.com/apt/ubuntu/14.04/amd64/latest/SALTSTACK-GPG-KEY.pub'
+      salt_apt_repo: 'https://repo.saltstack.com/apt/ubuntu/18.04/amd64/'
+      salt_apt_repo_key: 'https://repo.saltstack.com/apt/ubuntu/18.04/amd64/latest/SALTSTACK-GPG-KEY.pub'
       init_environment: |
         sudo mkdir -p /tmp/kitchen/var/cache/salt/master
         sudo apt-get update
@@ -128,6 +122,10 @@ platforms:
       name: vagrant
       gui: true
     provisioner:
+      # On Osx 'brew install unix2dos' or Centos 'yum install tofrodos'
+      cache_commands:
+        - touch %{sandbox_path}/srv/salt/cache_commands_test
+        - find %{sandbox_path} -type f | xargs unix2dos
       init_environment: |
         Clear-Host
         $AddedLocation ="c:\salt"
@@ -174,7 +172,7 @@ suites:
     includes:
       - debian-8
       - debian-9
-      - ubuntu-14.04
+      - ubuntu-18.04
       - ubuntu-16.04
   - name: yum
     provisioner:
