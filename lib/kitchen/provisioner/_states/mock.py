@@ -65,11 +65,7 @@ def remote_functions(name):
 def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, via_master=None, expr_form=None):
     global remote_functions_data
     log.info('MOCK: Publishing {0!r} for {1}'.format(fun, tgt))
-    log.debug('MOCK: arg type: {0}'.format(type(arg)))
-    log.debug('MOCK: arg: {0!r}'.format(arg))
     kwargs = salt.utils.args.yamlify_arg(arg)
-    log.debug('MOCK: kwargs type: {0}'.format(type(kwargs)))
-    log.debug('MOCK: kwargs: {0}'.format(kwargs))
 
     # Special case some functions for convinient usage
     # TODO(ppg): allow custom python files provided to override a function
