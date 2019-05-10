@@ -76,6 +76,9 @@ def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, v
     #   mock_remote_functions:
     #     'x509.sign_remote_certificate': mock_sign_remote_certificate.py
     if fun == 'x509.sign_remote_certificate':
+        # if salt.utils.args.yamlify failed to make a dict, try ast
+        if not isinstance(kwargs, dict):
+            kwargs = ast.literal_eval(kwargs)
         kwargs['text'] = True
         return {tgt: mock_sign_remote_certificate(**kwargs)}
 
