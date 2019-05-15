@@ -67,6 +67,7 @@ def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, v
     log.info('MOCK: Publishing {0!r} for {1}'.format(fun, tgt))
     log.debug('MOCK: Publish args: {0!r}'.format(arg))
     kwargs = salt.utils.args.yamlify_arg(arg)
+    log.debug('MOCK: args after yamlify: {0}'.format(kwargs))
 
     # Special case some functions for convinient usage
     # TODO(ppg): allow custom python files provided to override a function
