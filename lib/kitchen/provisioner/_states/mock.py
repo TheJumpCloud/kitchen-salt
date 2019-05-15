@@ -65,6 +65,7 @@ def remote_functions(name):
 def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, via_master=None, expr_form=None):
     global remote_functions_data
     log.info('MOCK: Publishing {0!r} for {1}'.format(fun, tgt))
+    log.debug('MOCK: Publish args: {0!r}'.format(arg))
     kwargs = salt.utils.args.yamlify_arg(arg)
 
     # Special case some functions for convinient usage
@@ -76,6 +77,7 @@ def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, v
         if not isinstance(kwargs, dict):
             kwargs = ast.literal_eval(kwargs)
         kwargs['text'] = True
+        log.debug('MOCK: sending certificate kwargs: {0}'.format(kwargs))
         return {tgt: mock_sign_remote_certificate(**kwargs)}
 
     if tgt not in remote_functions_data:
