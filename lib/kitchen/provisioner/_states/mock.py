@@ -65,9 +65,10 @@ def remote_functions(name):
 def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, via_master=None, expr_form=None):
     global remote_functions_data
     log.info('MOCK: Publishing {0!r} for {1}'.format(fun, tgt))
-    log.debug('MOCK: Publish args: {0!r}'.format(arg))
+    log.debug('MOCK: Publish args ({1}): {0!r}'.format(arg, type(arg)))
     kwargs = salt.utils.args.yamlify_arg(arg)
-    log.debug('MOCK: args after yamlify: {0}'.format(kwargs))
+    log.debug('MOCK: args after yamlify ({1}): {0!r}'.format(
+        kwargs, type(kwargs)))
 
     # Special case some functions for convinient usage
     # TODO(ppg): allow custom python files provided to override a function
@@ -78,7 +79,8 @@ def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, v
         if not isinstance(kwargs, dict):
             kwargs = ast.literal_eval(kwargs)
         kwargs['text'] = True
-        log.debug('MOCK: sending certificate kwargs: {0}'.format(kwargs))
+        log.debug('MOCK: sending certificate kwargs ({1}): {0}'.format(
+            kwargs, type(kwargs)))
         return {tgt: mock_sign_remote_certificate(**kwargs)}
 
     if tgt not in remote_functions_data:
