@@ -12,8 +12,10 @@ from salt.exceptions import SaltInvocationError
 
 log = logging.getLogger(__name__)
 
+
 def __virtual__():
-    return 'mock'
+    return "mock"
+
 
 mine_data = {}
 remote_functions_data = {}
@@ -22,16 +24,21 @@ remote_functions_data = {}
 def mine(name):
     global mine_data
     # FIXME(ppg): drive via configuration
-    for file in glob.glob('/tmp/kitchen/srv/mine/*'):
+    for file in glob.glob("/tmp/kitchen/srv/mine/*"):
         mine_data.update(yaml.load(open(file)))
-    __salt__['mine.get'] = _mock_get
-    return {'name': 'mine', 'changes': {}, 'result': True, 'comment': 'Replaced mine.get with mock'}
+    __salt__["mine.get"] = _mock_get
+    return {
+        "name": "mine",
+        "changes": {},
+        "result": True,
+        "comment": "Replaced mine.get with mock",
+    }
 
 
 def _parse_args(arg):
-    '''
+    """
     yamlify `arg` and ensure it's outermost datatype is a list
-    '''
+    """
     yaml_args = salt.utils.args.yamlify_arg(arg)
 
     if yaml_args is None:
@@ -42,15 +49,15 @@ def _parse_args(arg):
         return yaml_args
 
 
-def _mock_get(tgt, fun, tgt_type='glob', exclude_minion=False, expr_form=None):
+def _mock_get(tgt, fun, tgt_type="glob", exclude_minion=False, expr_form=None):
     global mine_data
-    log.info('MOCK: Fetching {0!r} for {1}'.format(fun, tgt))
+    log.info("MOCK: Fetching {0!r} for {1}".format(fun, tgt))
     if tgt not in mine_data:
-        log.warn('Cannot find target {} in mine.'.format(tgt))
+        log.warn("Cannot find target {} in mine.".format(tgt))
         return {}
     d = mine_data[tgt]
     if fun not in d:
-        log.warn('Cannot find target {} with function {} in mine.'.format(tgt, fun))
+        log.warn("Cannot find target {} with function {} in mine.".format(tgt, fun))
         return {}
     # TODO(ppg): allow lookup based on arg too
     d = d[fun]
@@ -60,7 +67,7 @@ def _mock_get(tgt, fun, tgt_type='glob', exclude_minion=False, expr_form=None):
 def remote_functions(name):
     global remote_functions_data
     # FIXME(ppg): drive via configuration
-    for file in glob.glob('/tmp/kitchen/srv/remote_functions/*'):
+    for file in glob.glob("/tmp/kitchen/srv/remote_functions/*"):
         remote_functions_data.update(yaml.load(open(file)))
 
     # Replacing __salt__['publish.publish'] is temporary until the modules are
@@ -68,47 +75,68 @@ def remote_functions(name):
     # hook into the lazy loader mechanism and when its 'publish.publish' we'll return
     # our mock publish helper
     original_getitem = LazyLoader.__getitem__
+
     def getitem(self, item):
-        if item == 'publish.publish':
+        if item == "publish.publish":
             return _mock_publish
         else:
             return original_getitem(self, item)
+
     LazyLoader.__getitem__ = getitem
 
-    return {'name': 'remote_functions', 'changes': {}, 'result': True, 'comment': 'Replaced publish.publish with mock'}
+    return {
+        "name": "remote_functions",
+        "changes": {},
+        "result": True,
+        "comment": "Replaced publish.publish with mock",
+    }
 
 
-def _mock_publish(tgt, fun, arg=None, tgt_type='glob', returner='', timeout=5, via_master=None, expr_form=None):
+def _mock_publish(
+    tgt,
+    fun,
+    arg=None,
+    tgt_type="glob",
+    returner="",
+    timeout=5,
+    via_master=None,
+    expr_form=None,
+):
     global remote_functions_data
-    log.info('MOCK: Publishing {0!r} for {1}'.format(fun, tgt))
+    log.info("MOCK: Publishing {0!r} for {1}".format(fun, tgt))
     kwargs = salt.utils.args.yamlify_arg(arg)
 
     # Special case some functions for convinient usage
     # TODO(ppg): allow custom python files provided to override a function
     #   mock_remote_functions:
     #     'x509.sign_remote_certificate': mock_sign_remote_certificate.py
-    if fun == 'x509.sign_remote_certificate':
+    if fun == "x509.sign_remote_certificate":
         # if salt.utils.args.yamlify failed to make a dict, try ast
         if not isinstance(kwargs, dict):
             kwargs = ast.literal_eval(kwargs)
-        kwargs['text'] = True
+        kwargs["text"] = True
         return {tgt: mock_sign_remote_certificate(**kwargs)}
 
     if tgt not in remote_functions_data:
         raise SaltInvocationError(
-            message='Cannot find target {} in remote functions.'.format(tgt))
+            message="Cannot find target {} in remote functions.".format(tgt)
+        )
     d = remote_functions_data[tgt]
     if fun not in d:
         raise SaltInvocationError(
-            message='Cannot find target {} with function {} in remote functions.'.format(tgt, fun))
+            message="Cannot find target {} with function {} in remote functions.".format(
+                tgt, fun
+            )
+        )
     d = d[fun]
-    if 'ret' not in d:
+    if "ret" not in d:
         raise SaltInvocationError(
-            message="target {} function {} is missing 'ret' field".format(tgt, fun))
+            message="target {} function {} is missing 'ret' field".format(tgt, fun)
+        )
     # TODO(ppg): allow lookup based on arg too
-    d = d['ret']
+    d = d["ret"]
     return {tgt: d}
 
 
 def mock_sign_remote_certificate(**kwargs):
-    return __salt__['x509.create_certificate'](**kwargs)
+    return __salt__["x509.create_certificate"](**kwargs)
