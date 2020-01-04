@@ -3,6 +3,7 @@ import ast
 import glob
 import yaml
 import salt.utils.args
+from salt.loader import LazyLoader
 
 import logging
 
@@ -10,6 +11,9 @@ import logging
 from salt.exceptions import SaltInvocationError
 
 log = logging.getLogger(__name__)
+
+def __virtual__():
+    return 'mock'
 
 mine_data = {}
 remote_functions_data = {}
@@ -58,7 +62,19 @@ def remote_functions(name):
     # FIXME(ppg): drive via configuration
     for file in glob.glob('/tmp/kitchen/srv/remote_functions/*'):
         remote_functions_data.update(yaml.load(open(file)))
-    __salt__['publish.publish'] = _mock_publish
+
+    # Replacing __salt__['publish.publish'] is temporary until the modules are
+    # refreshed, which happens after things like pkg.installed states; so instead let's
+    # hook into the lazy loader mechanism and when its 'publish.publish' we'll return
+    # our mock publish helper
+    original_getitem = LazyLoader.__getitem__
+    def getitem(self, item):
+        if item == 'publish.publish':
+            return _mock_publish
+        else:
+            return original_getitem(self, item)
+    LazyLoader.__getitem__ = getitem
+
     return {'name': 'remote_functions', 'changes': {}, 'result': True, 'comment': 'Replaced publish.publish with mock'}
 
 
