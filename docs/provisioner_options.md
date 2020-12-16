@@ -302,6 +302,12 @@ The result would be:
     |- baz
     |- [contents of qux]
 
+### pillar_env ###
+
+default: `nil`
+
+Environment to use in minion config file for the pillar root, if different from `salt_env`.
+
 ### mock_mine ###
 The mock_mine option allows you to load mine data from an external file.
 _Due to limitations in salt operating in `--local` mode, all mine data
@@ -657,7 +663,7 @@ Location to place the minion config in the sandbox.
 
 default: `nil`
 
-Local custom minion config template to be used in kitchen-salt.  The default is {file:lib/kitchen/provisioner/minion.erb}
+Local custom minion config template to be used in kitchen-salt. If filename ends in '.erb' it will be loaded as an Ruby ERB template, else it will be copied without modification. The default is {file:lib/kitchen/provisioner/minion.erb}
 
 ### salt_minion_id ###
 

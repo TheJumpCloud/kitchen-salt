@@ -50,6 +50,7 @@ module Kitchen
         is_file_root: false,
         local_salt_root: nil,
         omnibus_cachier: false,
+        pillar_env: nil,
         pillars_from_directories: [],
         pip_bin: 'pip',
         pip_editable: false,
@@ -59,7 +60,7 @@ module Kitchen
         remote_states: nil,
         require_chef: true,
         salt_apt_repo_key: 'https://repo.saltstack.com/apt/ubuntu/16.04/amd64/latest/SALTSTACK-GPG-KEY.pub',
-        salt_apt_repo: 'https://repo.saltstack.com/apt/ubuntu/16.04/amd64/',
+        salt_apt_repo: 'https://repo.saltstack.com/apt/ubuntu/16.04/amd64',
         salt_bootstrap_options: '',
         salt_bootstrap_url: 'https://bootstrap.saltstack.com',
         salt_config: '/etc/salt',
@@ -112,7 +113,8 @@ module Kitchen
       end
 
       def install_command
-        unless not config[:salt_install] || config[:salt_install] == 'pip' || config[:install_after_init_environment]
+        return unless config[:salt_install]
+        unless config[:salt_install] == 'pip' || config[:install_after_init_environment]
           setup_salt
         end
       end
@@ -129,6 +131,7 @@ module Kitchen
             #{config[:prepare_salt_environment]}
           PREPARE
         end
+        return cmd unless config[:salt_install]
         if config[:salt_install] == 'pip' || config[:install_after_init_environment]
           cmd << setup_salt
         end
@@ -215,6 +218,7 @@ module Kitchen
       end
 
       def prepare_install
+        return unless config[:salt_install]
         salt_version = config[:salt_version]
         if config[:salt_install] == 'pip'
           debug('Using pip to install')
@@ -296,7 +300,15 @@ module Kitchen
         if config[:pre_salt_command]
           cmd << "#{config[:pre_salt_command]} && "
         end
-        cmd << sudo("#{salt_call} --state-output=changes --config-dir=#{os_join(config[:root_path], salt_config_path)} state.highstate")
+        cmd << sudo("#{salt_call}")
+        state_output = config[:salt_minion_extra_config][:state_output]
+        if state_output
+          cmd << " --state-output=#{state_output}"
+        else
+          cmd << " --state-output=changes"
+        end
+        cmd << " --config-dir=#{os_join(config[:root_path], salt_config_path)}"
+        cmd << " state.highstate"
         cmd << " --log-level=#{config[:log_level]}" if config[:log_level]
         cmd << " --id=#{config[:salt_minion_id]}" if config[:salt_minion_id]
         cmd << " test=#{config[:dry_run]}" if config[:dry_run]
@@ -433,6 +445,13 @@ module Kitchen
       end
 
       def prepare_dependencies
+        # Dependency scripts are bash scripts only
+        # Copying them clobbers the kitchen temp directory
+        # with a file named `kitchen`. If adding Windows
+        # support for dependencies, relocate into a
+        # sub-directory
+        return if windows_os?
+
         # upload scripts
         sandbox_scripts_path = File.join(sandbox_path, config[:salt_config], 'scripts')
         info("Preparing scripts into #{config[:salt_config]}/scripts")
