@@ -140,7 +140,7 @@ Dictionary that will be turned into a top file on the test instance.
 
 default: `base`
 
-Environment to use in the environment to use in minion config file for the file and pillar roots.
+Environment to use in minion config file for the file and pillar roots.
 
 ### state_top_from_file ###
 
@@ -398,7 +398,7 @@ Method by which salt will be installed:
 - **apt**: install salt from an apt repository.
 - **distrib**: install the version of salt that comes with the distribution.
 - **ppa**: install salt from a ppa.
-- **none**: bypass salt installation.
+- **false**: bypass salt installation.
 
 Except for `distrib` and `bootstrap`, most of these options will require extra configuration to make sure it fits the tests distribution version.  Unless the newest version is used, then it should just work for yum and apt setups.
 
@@ -566,6 +566,12 @@ A bootstrap script used to provide Ruby (`ruby` and `ruby-dev`) required for the
 default: `https://www.chef.io/chef/install.sh`
 
 The chef bootstrap installer, used to provide Ruby for the serverspec test runner on the guest OS.
+
+### pre_salt_command ###
+
+default: nil
+
+Run any command just before running salt_command. If not successful, execution stops.
 
 ### require_chef ###
 

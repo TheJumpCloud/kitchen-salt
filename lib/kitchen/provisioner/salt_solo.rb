@@ -69,6 +69,7 @@ module Kitchen
         salt_mock_mine_root: '/srv/mine',
         salt_mock_remote_functions_root: '/srv/remote_functions',
         salt_force_color: false,
+        salt_enable_color: true,
         salt_install: 'bootstrap',
         salt_minion_config_dropin_files: [],
         salt_minion_config_template: nil,
@@ -111,7 +112,7 @@ module Kitchen
       end
 
       def install_command
-        unless config[:salt_install] == 'pip' || config[:install_after_init_environment]
+        unless not config[:salt_install] || config[:salt_install] == 'pip' || config[:install_after_init_environment]
           setup_salt
         end
       end
@@ -291,11 +292,16 @@ module Kitchen
           cmd << sudo("#{config[:root_path]}/gpgkey.sh;") if config[:gpg_key]
           salt_config_path = config[:salt_config]
         end
+
+        if config[:pre_salt_command]
+          cmd << "#{config[:pre_salt_command]} && "
+        end
         cmd << sudo("#{salt_call} --state-output=changes --config-dir=#{os_join(config[:root_path], salt_config_path)} state.highstate")
         cmd << " --log-level=#{config[:log_level]}" if config[:log_level]
         cmd << " --id=#{config[:salt_minion_id]}" if config[:salt_minion_id]
         cmd << " test=#{config[:dry_run]}" if config[:dry_run]
         cmd << ' --force-color' if config[:salt_force_color]
+        cmd << ' --no-color' if not config[:salt_enable_color]
         if "#{salt_version}" > RETCODE_VERSION || salt_version == 'latest'
           # hope for the best and hope it works eventually
           cmd << ' --retcode-passthrough'
