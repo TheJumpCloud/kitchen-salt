@@ -18,6 +18,8 @@
 
 require 'fileutils'
 require 'hashie'
+require 'json'
+require 'kitchen-salt/mock'
 require 'kitchen-salt/pillars'
 require 'kitchen-salt/states'
 require 'kitchen-salt/util'
@@ -32,14 +34,18 @@ module Kitchen
 
     class SaltSolo < Base
       include Kitchen::Salt::Util
+      include Kitchen::Salt::Mock
       include Kitchen::Salt::Pillars
       include Kitchen::Salt::States
 
       DEFAULT_CONFIG = {
         bootstrap_url: 'https://raw.githubusercontent.com/saltstack/kitchen-salt/master/assets/install.sh',
-        chef_bootstrap_url: 'https://www.getchef.com/chef/install.sh',
+        cache_commands: [],
+        chef_bootstrap_url: 'https://www.chef.io/chef/install.sh',
         dependencies: [],
         dry_run: false,
+        gpg_home: '~/.gnupg/',
+        gpg_key: nil,
         install_after_init_environment: false,
         is_file_root: false,
         local_salt_root: nil,
@@ -60,6 +66,8 @@ module Kitchen
         salt_copy_filter: [],
         salt_env: 'base',
         salt_file_root: '/srv/salt',
+        salt_mock_mine_root: '/srv/mine',
+        salt_mock_remote_functions_root: '/srv/remote_functions',
         salt_force_color: false,
         salt_install: 'bootstrap',
         salt_minion_config_dropin_files: [],
@@ -80,7 +88,8 @@ module Kitchen
         state_top_from_file: false,
         state_top: {},
         vendor_path: nil,
-        vendor_repo: {}
+        vendor_repo: {},
+        run_salt_call: true
       }.freeze
 
       WIN_DEFAULT_CONFIG = {
@@ -111,7 +120,7 @@ module Kitchen
         cmd = ''
         unless windows_os?
           cmd += <<-CHOWN
-            #{sudo('chown')} "${SUDO_USER:-$USER}" -R "#{config[:root_path]}/#{config[:salt_file_root]}"
+            #{sudo('chown')} -R "${SUDO_USER:-$USER}" "#{config[:root_path]}/#{config[:salt_file_root]}"
           CHOWN
         end
         if config[:prepare_salt_environment]
@@ -191,12 +200,15 @@ module Kitchen
       def create_sandbox
         super
         prepare_data
+        prepare_gpg_key
         prepare_install
         prepare_minion
+        prepare_mock
         prepare_pillars
         prepare_grains
         prepare_states
         prepare_state_top
+        prepare_cache_commands
         # upload scripts, cached formulas, and setup system repositories
         prepare_dependencies
       end
@@ -248,27 +260,43 @@ module Kitchen
         end
       end
 
+      def prepare_command
+        # TODO(ppg): make work on windows
+        data = get_mock_mine_data
+
+        # data has format of
+        #
+        #   func1:
+        #     func1_data
+        #   func2:
+        #     func2_data
+        #
+        # TODO(ppg): would like to support top-level keys of machines, but salt doesn't support that with --local option:
+        # https://github.com/saltstack/salt/blob/ec973104afd2a7b68460f3a48258315ba5dd948d/salt/modules/mine.py#L289-L305
+        # Update the mine_cache with the new data
+        sudo("salt-call --local --config-dir=/tmp/kitchen/etc/salt data.update mine_cache '#{JSON.generate(data)}'")
+      end
+
       def salt_command
         salt_version = config[:salt_version]
 
         cmd = ''
         if windows_os?
-          salt_call = "c:\\salt\\salt-call.bat"
           salt_config_path = config[:salt_config]
           cmd << "(get-content #{os_join(config[:root_path], salt_config_path, 'minion')}) -replace '\\$env:TEMP', $env:TEMP | set-content #{os_join(config[:root_path], salt_config_path, 'minion')} ;"
         else
           # install/update dependencies
           cmd << sudo("chmod +x #{config[:root_path]}/*.sh;")
           cmd << sudo("#{config[:root_path]}/dependencies.sh;")
+          cmd << sudo("#{config[:root_path]}/gpgkey.sh;") if config[:gpg_key]
           salt_config_path = config[:salt_config]
-          salt_call = 'salt-call'
         end
         cmd << sudo("#{salt_call} --state-output=changes --config-dir=#{os_join(config[:root_path], salt_config_path)} state.highstate")
         cmd << " --log-level=#{config[:log_level]}" if config[:log_level]
         cmd << " --id=#{config[:salt_minion_id]}" if config[:salt_minion_id]
         cmd << " test=#{config[:dry_run]}" if config[:dry_run]
         cmd << ' --force-color' if config[:salt_force_color]
-        if salt_version > RETCODE_VERSION || salt_version == 'latest'
+        if "#{salt_version}" > RETCODE_VERSION || salt_version == 'latest'
           # hope for the best and hope it works eventually
           cmd << ' --retcode-passthrough'
         end
@@ -280,12 +308,14 @@ module Kitchen
         debug("running driver #{name}")
         debug(diagnose)
 
+        return unless config[:run_salt_call]
+
         # config[:salt_version] can be 'latest' or 'x.y.z', 'YYYY.M.x' etc
         # error return codes are a mess in salt:
         #  https://github.com/saltstack/salt/pull/11337
         # Unless we know we have a version that supports --retcode-passthrough
         # attempt to scan the output for signs of failure
-        if config[:salt_version] <= RETCODE_VERSION
+        if "#{config[:salt_version]}" <= RETCODE_VERSION
           # scan the output for signs of failure, there is a risk of false negatives
           fail_grep = 'grep -e Result.*False -e Data.failed.to.compile -e No.matching.sls.found.for'
           # capture any non-zero exit codes from the salt-call | tee pipe
@@ -313,6 +343,20 @@ module Kitchen
         tmpdata_dir = File.join(sandbox_path, 'data')
         FileUtils.mkdir_p(tmpdata_dir)
         cp_r_with_filter(config[:data_path], tmpdata_dir, config[:salt_copy_filter])
+      end
+
+      def prepare_gpg_key
+        return unless config[:gpg_key]
+
+        info('Preparing gpg_key')
+        debug("Using gpg key: #{config[:gpg_key]}")
+
+        system("gpg --homedir #{config[:gpg_home]} -o #{File.join(sandbox_path, 'gpgkey.txt')} --armor --export-secret-keys #{config[:gpg_key]}")
+
+        gpg_template = File.expand_path('./../gpgkey.erb', __FILE__)
+        erb = ERB.new(File.read(gpg_template)).result(binding)
+        debug('Install Command:' + erb.to_s)
+        write_raw_file(File.join(sandbox_path, 'gpgkey.sh'), erb)
       end
 
       def prepare_minion_base_config
@@ -415,6 +459,23 @@ module Kitchen
         dependencies_script = File.expand_path('./../dependencies.erb', __FILE__)
         dependencies_content = ERB.new(File.read(dependencies_script)).result(binding)
         write_raw_file(File.join(sandbox_path, 'dependencies.sh'), dependencies_content)
+      end
+
+      def prepare_cache_commands
+        ctx = to_hash
+        config[:cache_commands].each do |cmd|
+          system(cmd % ctx)
+          if $?.exitstatus.nonzero?
+            raise ActionFailed,
+              "cache_command '#{cmd}' failed to execute (exit status #{$?.exitstatus})"
+          end
+        end
+      end
+
+      def to_hash
+        hash = Hash.new
+        instance_variables.each {|var| hash[var[1..-1]] = instance_variable_get(var) }
+        hash.map{|k,v| [k.to_s.to_sym,v]}.to_h
       end
     end
   end

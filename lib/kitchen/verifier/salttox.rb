@@ -4,13 +4,12 @@ require "kitchen/verifier/base"
 
 module Kitchen
   module Verifier
-    class Runtests < Kitchen::Verifier::Base
+    class Salttox < Kitchen::Verifier::Base
       kitchen_verifier_api_version 1
 
       plugin_version Kitchen::VERSION
 
       default_config :testingdir, '/testing'
-      default_config :python_bin, 'python2'
       default_config :verbose, false
       default_config :run_destructive, false
       default_config :xml, false
@@ -20,8 +19,6 @@ module Kitchen
       default_config :transport, false
       default_config :save, {}
       default_config :windows, false
-      default_config :enable_filenames, false
-      default_config :from_filenames, []
 
       def call(state)
         info("[#{name}] Verify on instance #{instance.name} with state=#{state}")
@@ -29,25 +26,21 @@ module Kitchen
         if ENV['KITCHEN_TESTS']
           ENV['KITCHEN_TESTS'].split(' ').each{|test| config[:tests].push(test)}
         end
-        if config[:enable_filenames] and ENV['CHANGE_TARGET'] and ENV['BRANCH_NAME']
-          require 'git'
-          repo = Git.open('.')
-	  config[:from_filenames] = repo.diff("origin/#{ENV['CHANGE_TARGET']}", "origin/#{ENV['BRANCH_NAME']}").name_status.keys.select{|file| file.end_with?('.py')}
-        end
         command = [
-          (config[:windows] ? 'python.exe' : config[:python_bin]),
-          File.join(root_path, config[:testingdir], '/tests/runtests.py'),
+          'tox -c',
+          File.join(root_path, config[:testingdir], 'tox.ini'),
+          "-e #{instance.suite.name}",
+          '--',
           '--sysinfo',
           '--output-columns=80',
-          (config[:windows] && config[:tests].empty? ? "--names-file=#{root_path}\\testing\\tests\\whitelist.txt" : ''),
+          (config[:windows] ? "--names-file=#{root_path}\\testing\\tests\\whitelist.txt" : ''),
           (config[:transport] ? "--transport=#{config[:transport]}" : ''),
-          (config[:verbose] ? '-vv' : '-v'),
+          (config[:verbose] ? '-v' : ''),
           (config[:run_destructive] ? "--run-destructive" : ''),
-          (config[:coverage_xml] ? "--coverage-xml=#{config[:coverage_xml]}" : ''),
-          (config[:xml] ? "--xml=#{config[:xml]}" : ''),
+          (config[:coverage_xml] ? "--cov=salt/ --cov-report xml:#{config[:coverage_xml]}" : ''),
+          (config[:xml] ? "--junitxml=#{config[:xml]}" : ''),
           config[:types].collect{|type| "--#{type}"}.join(' '),
-          config[:tests].collect{|test| "-n #{test}"}.join(' '),
-	  (config[:from_filenames].any? ? "--from-filenames=#{config[:from_filenames].join(',')}" : ''),
+          config[:tests].join(' '),
           '2>&1',
         ].join(' ')
         if config[:windows]

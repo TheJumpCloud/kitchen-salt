@@ -86,7 +86,7 @@ default: `nil`
 
 Note that this is not used if `state_collection` or `local_salt_root` are specified, or `is_file_root` is set to `true`.
 
-This is used for testing environments.  Specify the salt states elsewhere, and then use them to deploy code from the current environment. 
+This is used for testing environments.  Specify the salt states elsewhere, and then use them to deploy code from the current environment.
 
 For example, saltstack itself uses a `Salt-Jenkins` project to configure its testing environment.  This is done like so:
 
@@ -302,6 +302,89 @@ The result would be:
     |- baz
     |- [contents of qux]
 
+### mock_mine ###
+The mock_mine option allows you to load mine data from an external file.
+_Due to limitations in salt operating in `--local` mode, all mine data
+will be for the minion ID._ The file should hold keys of functions
+followed by their data; i.e.:
+
+##### `.kitchen.yml` file
+      mock-mine: mine.example
+
+##### `mine.example` file
+      'x509.get_pem_entries':
+        /etc/pki/jumpcloud/ca.crt: |
+          -----BEGIN CERTIFICATE-----
+          MIIEADCCAuigAwIBAgIBADANBgkqhkiG9w0BAQUFADBjMQswCQYDVQQGEwJVUzEh
+          MB8GA1UEChMYVGhlIEdvIERhZGR5IEdyb3VwLCBJbmMuMTEwLwYDVQQLEyhHbyBE
+          YWRkeSBDbGFzcyAyIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MB4XDTA0MDYyOTE3
+          MDYyMFoXDTM0MDYyOTE3MDYyMFowYzELMAkGA1UEBhMCVVMxITAfBgNVBAoTGFRo
+          ZSBHbyBEYWRkeSBHcm91cCwgSW5jLjExMC8GA1UECxMoR28gRGFkZHkgQ2xhc3Mg
+          MiBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTCCASAwDQYJKoZIhvcNAQEBBQADggEN
+          ADCCAQgCggEBAN6d1+pXGEmhW+vXX0iG6r7d/+TvZxz0ZWizV3GgXne77ZtJ6XCA
+          PVYYYwhv2vLM0D9/AlQiVBDYsoHUwHU9S3/Hd8M+eKsaA7Ugay9qK7HFiH7Eux6w
+          wdhFJ2+qN1j3hybX2C32qRe3H3I2TqYXP2WYktsqbl2i/ojgC95/5Y0V4evLOtXi
+          EqITLdiOr18SPaAIBQi2XKVlOARFmR6jYGB0xUGlcmIbYsUfb18aQr4CUWWoriMY
+          avx4A6lNf4DD+qta/KFApMoZFv6yyO9ecw3ud72a9nmYvLEHZ6IVDd2gWMZEewo+
+          YihfukEHU1jPEX44dMX4/7VpkI+EdOqXG68CAQOjgcAwgb0wHQYDVR0OBBYEFNLE
+          sNKR1EwRcbNhyz2h/t2oatTjMIGNBgNVHSMEgYUwgYKAFNLEsNKR1EwRcbNhyz2h
+          /t2oatTjoWekZTBjMQswCQYDVQQGEwJVUzEhMB8GA1UEChMYVGhlIEdvIERhZGR5
+          IEdyb3VwLCBJbmMuMTEwLwYDVQQLEyhHbyBEYWRkeSBDbGFzcyAyIENlcnRpZmlj
+          YXRpb24gQXV0aG9yaXR5ggEAMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQEFBQAD
+          ggEBADJL87LKPpH8EsahB4yOd6AzBhRckB4Y9wimPQoZ+YeAEW5p5JYXMP80kWNy
+          OO7MHAGjHZQopDH2esRU1/blMVgDoszOYtuURXO1v0XJJLXVggKtI3lpjbi2Tc7P
+          TMozI+gciKqdi0FuFskg5YmezTvacPd+mSYgFFQlq25zheabIZ0KbIIOqPjCDPoQ
+          HmyW74cNxA9hi63ugyuV+I6ShHI56yDqg+2DzZduCLzrTia2cyvk0/ZM/iZx4mER
+          dEr/VxqHD3VILs9RaRegAhJhldXRQLIQTO7ErBBDpqWeCtWVYpoNz4iCxTIM5Cuf
+          ReYNnyicsbkqWletNw+vHX/bvZ8=
+          -----END CERTIFICATE-----
+
+
+### mock_remote_functions ###
+The mock_remote_functions option allows you to mock response to remote
+function calls from an external file. The file should hold keys of
+minion targets followed by the function and return data.
+
+##### `.kitchen.yml` file
+      mock-remote-functions: remote_functions.example
+
+##### `remote_functions.example` file
+      centos-7.vagrantup.com:
+        network.ip_addrs
+          ret:
+            - 1.2.3.4
+
+##### Special Cases
+
+###### `x509.sign_remote_certificate`
+
+Because signing a remote certificate requires the generate certificate
+to match the key provided as well as to be generated from a known CA
+this method is a special case. It will be intercepted by a method that
+will essentailly call `x509.create_certificate` on the local machine.
+This means that the pillar must configure the following information:
+
+      x509_signing_policies:
+        sample_policy:
+          signing_private_key: /etc/pki/sample/ca.key
+          signing_cert: /etc/pki/sample/ca.crt
+          O: Widgets Co
+          OU: Infrastructure
+          C: US
+          ST: Wisconsin
+          L: Madison
+          Email: bucky@uw.edu
+          basicConstraints: "critical CA:false"
+          subjectKeyIdentifier: hash
+          authorityKeyIdentifier: keyid,issuer:always
+          days_valid: 365
+
+*NOTE: the caller of the state `x509.sign_remote_certificate` will
+specify a siging_policy that must match `sample_policy` above. In
+addition the callee is responsible for laying down the
+`signing_private_key` and `signing_cert`.*
+
+
 ## Install Salt ##
 
 ### salt_install ###
@@ -333,7 +416,7 @@ This is also used to verify that the correct version of salt was installed befor
 
 default: `https://bootstrap.saltstack.com`
 
-Location of the bootstrap script. This can also be a file located locally.
+Location of the bootstrap script. This can also be a file located locally. If running a local file, `install_after_init_environment` must be set to `true`.
 
 For Windows, use the [powershell script](https://github.com/saltstack/salt-bootstrap/blob/develop/bootstrap-salt.ps1)
 
@@ -354,19 +437,21 @@ Details on the various options available at the [salt-bootstrap](https://docs.sa
 
 For the Windows Powershell script:
 
-    platform:
+    platforms:
       - name: windows
-        salt_bootstrap_script: https://github.com/saltstack/salt-bootstrap/blob/develop/bootstrap-salt.ps1
-        salt_bootstrap_options: -version 2017.7.2
+        provisioner:
+          salt_bootstrap_script: https://github.com/saltstack/salt-bootstrap/blob/develop/bootstrap-salt.ps1
+          salt_bootstrap_options: -version 2017.7.2
 
 You can also use `%s` in any part of this, to replace with the version of salt, as specified by `salt_version`
 
 For example, below is a custom bootstrap option for centos6 requiring python2.7, here `%s` gets replaced by `2018.3`
 
-    platform:
+    platforms:
       - centos-6:
-        salt_bootstrap_options: "-P -p git -p curl -p sudo -y -x python2.7 git %s"
-    
+        provisioner:
+          salt_bootstrap_options: "-P -p git -p curl -p sudo -y -x python2.7 git %s"
+
     suites:
       - name: oxygen
         provisioner:
@@ -446,6 +531,18 @@ pip binary in the `$PATH` or path to a pip binary to use for installing salt.
 
 ## Extra Config Options ##
 
+### gpg_home ###
+
+default: `~/.gnupg/`
+
+Directory that the gnupg keyring is located.
+
+### gpg_key ###
+
+default: `nil`
+
+Identifier for the gpg key to transfer to the test instance.  Email or key id will work.
+
 ### init_environment ###
 
 default: `""`
@@ -466,7 +563,7 @@ A bootstrap script used to provide Ruby (`ruby` and `ruby-dev`) required for the
 
 ### chef_bootstrap_url ###
 
-default: `https://www.getchef.com/chef/install.sh`
+default: `https://www.chef.io/chef/install.sh`
 
 The chef bootstrap installer, used to provide Ruby for the serverspec test runner on the guest OS.
 
@@ -475,6 +572,19 @@ The chef bootstrap installer, used to provide Ruby for the serverspec test runne
 default: `true`
 
 Install chef.  This is required by the busser to run tests, if no verification driver is specified in the `.kitchen.yml`
+
+### run_salt_call ###
+
+default: `true`
+
+If `false` bypassed the `salt-call` command execution. For cases where the guest OS is already provisioned.
+
+### salt_call_command ###
+
+default for Windows: `c:\salt\salt-call.bat`
+default for others: `salt-call`
+
+Command used to invoke `salt-call`.
 
 ### salt_config ###
 
