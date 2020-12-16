@@ -19,7 +19,7 @@ function fetchDependencies() {
     METADATA="$1";
     grep -E "^dependencies:" "$METADATA" >/dev/null || return 0
     # shellcheck disable=SC2086
-    (python - "$METADATA" | while read -r dep; do fetchGitFormula $dep; done) <<-DEPS 
+    (python - "$METADATA" | while read -r dep; do fetchGitFormula $dep; done) <<-DEPS
 		import sys,yaml
 		for dep in yaml.load(open(sys.argv[1], "ro"))["dependencies"]:
 		  print("{source} {name}").format(**dep)
@@ -46,8 +46,8 @@ function fetchGitFormula() {
               test ! -e .git || git pull -r
               popd &>/dev/null || exit
           else
-              echo "git clone $source $GIT_FORMULAS_PATH/$name -b $branch"
-              git clone "$source" "$GIT_FORMULAS_PATH/$name" -b "$branch"
+              echo "git clone --quiet $source $GIT_FORMULAS_PATH/$name -b $branch"
+              git clone --quiet "$source" "$GIT_FORMULAS_PATH/$name" -b "$branch"
           fi
           # install dependencies
           FETCHED+=("$name")

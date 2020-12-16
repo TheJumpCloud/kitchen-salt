@@ -1,4 +1,5 @@
 <%=
+log_level = config[:log_level]
 salt_install = config[:salt_install]
 salt_url = config[:salt_bootstrap_url]
 salt_version = config[:salt_version]
@@ -19,9 +20,17 @@ config[:pip_extra_index_url].each do |url|
   salt_pip_install_command += ' --extra-index-url ' + url
 end
 
+
+log_suppression = log_level != "warn" && log_level != "error" ? "" : <<-LOG_SUPPRESSION
+# Suppress logging for quiet mode
+exec 1>/dev/null
+LOG_SUPPRESSION
+
 <<-INSTALL
 sh -c '
 #{Util.shell_helpers}
+
+#{log_suppression}
 
 # what version of salt is installed?
 command -v #{salt_call} >/dev/null 2>&1 && SALT_VERSION=$(#{salt_call} --version|cut -d " " -f 2)
