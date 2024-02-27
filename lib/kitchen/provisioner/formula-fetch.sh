@@ -74,7 +74,7 @@ function linkFormulas() {
       do
         name=$(basename "$formula")
         if [[ ! -L "$SALT_ROOT/$name" ]]; then
-          ln -fs "$formula/$name" "$SALT_ROOT/$name"
+          cp -r "$formula/$name" "$SALT_ROOT/$name"
         fi
         find "$formula" -maxdepth 1 -mindepth 1 -type d |grep -E "_(modules|states|grains|renderers|returners)" | xargs -I{} \
           basename {}| xargs -I{} cp -rs "$formula"/{} "$SALT_ROOT"/
