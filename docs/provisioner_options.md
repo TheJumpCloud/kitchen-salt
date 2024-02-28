@@ -22,7 +22,7 @@ Name of the formula directory for finding where the state files are located.
 
 ### state_collection ###
 
-default: `nil`
+default: `false`
 
 Directory containing salt states that is not a formula
 
@@ -302,6 +302,93 @@ The result would be:
     |- baz
     |- [contents of qux]
 
+### mock_mine ###
+
+The mock_mine option allows you to load mine data from an external file.
+_Due to limitations in salt operating in `--local` mode, all mine data
+will be for the minion ID._ The file should hold keys of functions
+followed by their data; i.e.:
+
+##### `.kitchen.yml` file
+
+      mock-mine: mine.example
+
+##### `mine.example` file
+
+      'x509.get_pem_entries':
+        /etc/pki/jumpcloud/ca.crt: |
+          -----BEGIN CERTIFICATE-----
+          MIIEADCCAuigAwIBAgIBADANBgkqhkiG9w0BAQUFADBjMQswCQYDVQQGEwJVUzEh
+          MB8GA1UEChMYVGhlIEdvIERhZGR5IEdyb3VwLCBJbmMuMTEwLwYDVQQLEyhHbyBE
+          YWRkeSBDbGFzcyAyIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MB4XDTA0MDYyOTE3
+          MDYyMFoXDTM0MDYyOTE3MDYyMFowYzELMAkGA1UEBhMCVVMxITAfBgNVBAoTGFRo
+          ZSBHbyBEYWRkeSBHcm91cCwgSW5jLjExMC8GA1UECxMoR28gRGFkZHkgQ2xhc3Mg
+          MiBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTCCASAwDQYJKoZIhvcNAQEBBQADggEN
+          ADCCAQgCggEBAN6d1+pXGEmhW+vXX0iG6r7d/+TvZxz0ZWizV3GgXne77ZtJ6XCA
+          PVYYYwhv2vLM0D9/AlQiVBDYsoHUwHU9S3/Hd8M+eKsaA7Ugay9qK7HFiH7Eux6w
+          wdhFJ2+qN1j3hybX2C32qRe3H3I2TqYXP2WYktsqbl2i/ojgC95/5Y0V4evLOtXi
+          EqITLdiOr18SPaAIBQi2XKVlOARFmR6jYGB0xUGlcmIbYsUfb18aQr4CUWWoriMY
+          avx4A6lNf4DD+qta/KFApMoZFv6yyO9ecw3ud72a9nmYvLEHZ6IVDd2gWMZEewo+
+          YihfukEHU1jPEX44dMX4/7VpkI+EdOqXG68CAQOjgcAwgb0wHQYDVR0OBBYEFNLE
+          sNKR1EwRcbNhyz2h/t2oatTjMIGNBgNVHSMEgYUwgYKAFNLEsNKR1EwRcbNhyz2h
+          /t2oatTjoWekZTBjMQswCQYDVQQGEwJVUzEhMB8GA1UEChMYVGhlIEdvIERhZGR5
+          IEdyb3VwLCBJbmMuMTEwLwYDVQQLEyhHbyBEYWRkeSBDbGFzcyAyIENlcnRpZmlj
+          YXRpb24gQXV0aG9yaXR5ggEAMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQEFBQAD
+          ggEBADJL87LKPpH8EsahB4yOd6AzBhRckB4Y9wimPQoZ+YeAEW5p5JYXMP80kWNy
+          OO7MHAGjHZQopDH2esRU1/blMVgDoszOYtuURXO1v0XJJLXVggKtI3lpjbi2Tc7P
+          TMozI+gciKqdi0FuFskg5YmezTvacPd+mSYgFFQlq25zheabIZ0KbIIOqPjCDPoQ
+          HmyW74cNxA9hi63ugyuV+I6ShHI56yDqg+2DzZduCLzrTia2cyvk0/ZM/iZx4mER
+          dEr/VxqHD3VILs9RaRegAhJhldXRQLIQTO7ErBBDpqWeCtWVYpoNz4iCxTIM5Cuf
+          ReYNnyicsbkqWletNw+vHX/bvZ8=
+          -----END CERTIFICATE-----
+
+### mock_remote_functions ###
+
+The mock_remote_functions option allows you to mock response to remote
+function calls from an external file. The file should hold keys of
+minion targets followed by the function and return data.
+
+##### `.kitchen.yml` file
+
+      mock-remote-functions: remote_functions.example
+
+##### `remote_functions.example` file
+
+      centos-7.vagrantup.com:
+        network.ip_addrs
+          ret:
+            - 1.2.3.4
+
+##### Special Cases
+
+###### `x509.sign_remote_certificate`
+
+Because signing a remote certificate requires the generate certificate
+to match the key provided as well as to be generated from a known CA
+this method is a special case. It will be intercepted by a method that
+will essentailly call `x509.create_certificate` on the local machine.
+This means that the pillar must configure the following information:
+
+      x509_signing_policies:
+        sample_policy:
+          signing_private_key: /etc/pki/sample/ca.key
+          signing_cert: /etc/pki/sample/ca.crt
+          O: Widgets Co
+          OU: Infrastructure
+          C: US
+          ST: Wisconsin
+          L: Madison
+          Email: bucky@uw.edu
+          basicConstraints: "critical CA:false"
+          subjectKeyIdentifier: hash
+          authorityKeyIdentifier: keyid,issuer:always
+          days_valid: 365
+
+*NOTE: the caller of the state `x509.sign_remote_certificate` will
+specify a siging_policy that must match `sample_policy` above. In
+addition the callee is responsible for laying down the
+`signing_private_key` and `signing_cert`.*
+
 ### pillar_env ###
 
 default: `nil`
@@ -420,11 +507,11 @@ This is also used to verify that the correct version of salt was installed befor
 
 ### salt_bootstrap_url ###
 
-default: `https://bootstrap.saltstack.com`
+default: `https://bootstrap.saltproject.io`
 
 Location of the bootstrap script. This can also be a file located locally. If running a local file, `install_after_init_environment` must be set to `true`.
 
-For Windows, use the [powershell script](https://github.com/saltstack/salt-bootstrap/blob/develop/bootstrap-salt.ps1)
+For Windows, use the [powershell script](https://winbootstrap.saltproject.io/develop)
 
 ### salt_bootstrap_options ###
 
@@ -439,7 +526,7 @@ For example, this could be used to install salt from the develop branch:
         provisioner:
           salt_bootstrap_options: -M -N git develop
 
-Details on the various options available at the [salt-bootstrap](https://docs.saltstack.com/en/latest/topics/tutorials/salt_bootstrap.html) documentation.
+Details on the various options available at the [salt-bootstrap](https://docs.saltproject.io/en/latest/topics/tutorials/salt_bootstrap.html) documentation.
 
 For the Windows Powershell script:
 
@@ -466,12 +553,12 @@ For example, below is a custom bootstrap option for centos6 requiring python2.7,
 
 ### salt_apt_repo ###
 
-default: `https://repo.saltstack.com/apt/ubuntu/16.04/amd64/`
+default: `https://repo.saltproject.io/apt/ubuntu/16.04/amd64`
 This should be the top level of the apt repository so that the `salt_version` can be appended to the url.
 
 ### salt_apt_repo_key ###
 
-default: `https://repo.saltstack.com/apt/ubuntu/16.04/amd64/latest/SALTSTACK-GPG-KEY.pub`
+default: `https://repo.saltproject.io/apt/ubuntu/16.04/amd64/latest/SALTSTACK-GPG-KEY.pub`
 
 The location of the apt repo key.
 
@@ -479,31 +566,31 @@ The location of the apt repo key.
 
 default: `ppa:saltstack/salt`
 
-Specify the ppa to enable for installing.  This is probably not as useful anymore now that salt is managed from the [official repos](https://repo.saltstack.com/#ubuntu)
+Specify the ppa to enable for installing.  This is probably not as useful anymore now that salt is managed from the [official repos](https://repo.saltproject.io/#ubuntu)
 
 ### salt_yum_rpm_key ###
 
-default: `https://repo.saltstack.com/yum/redhat/7/x86_64/archive/%s/SALTSTACK-GPG-KEY.pub`
+default: `https://repo.saltproject.io/yum/redhat/7/x86_64/archive/%s/SALTSTACK-GPG-KEY.pub`
 
 The rpm key that should be installed for verifying signatures of the yum repo packages.
 
 ### salt_yum_repo ###
 
-default: `https://repo.saltstack.com/yum/redhat/$releasever/$basearch/archive/%s`
+default: `https://repo.saltproject.io/yum/redhat/$releasever/$basearch/archive/%s`
 
-The baseurl for the yum repository.  `%s` is replaced with `salt_version`. More information on [SaltStack Package Repo](https://repo.saltstack.com/)
+The baseurl for the yum repository.  `%s` is replaced with `salt_version`. More information on [SaltStack Package Repo](https://repo.saltproject.io/)
 
 ### salt_yum_repo_key ###
 
-default: `https://repo.saltstack.com/yum/redhat/$releasever/$basearch/archive/%s/SALTSTACK-GPG-KEY.pub`
+default: `https://repo.saltproject.io/yum/redhat/$releasever/$basearch/archive/%s/SALTSTACK-GPG-KEY.pub`
 
-The gpg key url to the key for the yum repository file. `%s` is replaced with `salt_version`. More information on [SaltStack Package Repo](https://repo.saltstack.com/)
+The gpg key url to the key for the yum repository file. `%s` is replaced with `salt_version`. More information on [SaltStack Package Repo](https://repo.saltproject.io/)
 
 ### salt_yum_repo_latest ###
 
-default : `https://repo.saltstack.com/yum/redhat/salt-repo-latest-2.el7.noarch.rpm`
+default : `https://repo.saltproject.io/yum/redhat/salt-repo-latest-2.el7.noarch.rpm`
 
-The url for the yum repository rpm. Used to install if `salt_version` is `latest`. More information on [SaltStack Package Repo](https://repo.saltstack.com/)
+The url for the yum repository rpm. Used to install if `salt_version` is `latest`. More information on [SaltStack Package Repo](https://repo.saltproject.io/)
 
 ### pip_pkg ###
 
@@ -519,7 +606,7 @@ Install using the editable flag for pip
 
 ### pip_index_url ###
 
-default: `https://pypi.python.org/simple/`
+default: `https://pypi.org/simple/`
 
 Path to the pypi simple index to use for installing salt.
 
@@ -593,8 +680,7 @@ If `false` bypassed the `salt-call` command execution. For cases where the guest
 
 ### salt_call_command ###
 
-default for Windows: `c:\salt\salt-call.bat`
-default for others: `salt-call`
+default: `salt-call`
 
 Command used to invoke `salt-call`.
 

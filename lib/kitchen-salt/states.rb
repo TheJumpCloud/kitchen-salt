@@ -20,6 +20,9 @@ module Kitchen
           # load a top.sls from disk
           if config[:local_salt_root].nil?
             top_file = 'top.sls'
+            unless config[:state_collection].nil?
+              top_file = File.join(config[:state_collection], top_file)
+            end
           else
             top_file = File.join(config[:local_salt_root], 'salt/top.sls')
           end
@@ -77,7 +80,7 @@ module Kitchen
         cp_r_with_filter(File.join(path, formula), formula_dir, config[:salt_copy_filter])
 
         # copy across the _modules etc directories for python implementation
-        %w(_modules _states _grains _renderers _returners).each do |extrapath|
+        %w(_modules _states _grains _renderers _returners _runners _utils).each do |extrapath|
           prepare_formula_dir(path, extrapath)
         end
       end
@@ -96,6 +99,9 @@ module Kitchen
 
         if config[:local_salt_root].nil?
           states_location = config[:kitchen_root]
+          if config[:state_collection]
+            states_location = File.join(states_location, config[:state_collection])
+          end
         else
           states_location = File.join(config[:local_salt_root], 'salt')
         end

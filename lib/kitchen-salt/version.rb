@@ -1,5 +1,5 @@
 module Kitchen
   module Salt
-    VERSION = '0.6.3'.freeze
+    VERSION = '0.7.2'.freeze
   end
 end

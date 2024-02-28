@@ -15,12 +15,17 @@ module Kitchen
       default_config :tests, []
       default_config :save, {}
       default_config :windows, nil
+      default_config :windows do |verifier|
+        verifier.windows_os? ? true : false
+      end
       default_config :verbose, false
       default_config :run_destructive, false
       default_config :runtests, false
       default_config :coverage, false
       default_config :junitxml, false
       default_config :from_filenames, []
+      default_config :from_filenames_basename, "changed-files-list.txt"
+      default_config :from_filenames_path, false
       default_config :enable_filenames, false
       default_config :passthrough_opts, []
       default_config :output_columns, 120
@@ -28,16 +33,10 @@ module Kitchen
       default_config :sys_stats, false
       default_config :environment_vars, {}
       default_config :zip_windows_artifacts, false
+      default_config :pytest_nox_session, false
 
       def call(state)
-        if config[:windows].nil?
-          # Since windows is not set, lets try and guess since kitchen actually knows this infomation
-          if instance.platform.os_type == 'windows'
-            config[:windows] = true
-          else
-            config[:windows] = false
-          end
-        end
+        create_sandbox
         debug("Detected platform for instance #{instance.name}: #{instance.platform.os_type}. Config's windows setting value: #{config[:windows]}")
         if (ENV['ONLY_DOWNLOAD_ARTEFACTS'] || '') == '1'
           only_download_artefacts = true
@@ -49,23 +48,57 @@ module Kitchen
         else
           dont_download_artefacts = false
         end
+
         if only_download_artefacts and dont_download_artefacts
           error_msg = "The environment variables 'ONLY_DOWNLOAD_ARTEFACTS' or 'DONT_DOWNLOAD_ARTEFACTS' cannot be both set to '1'"
           error(error_msg)
           raise ActionFailed, error_msg
         end
+        if (ENV['ONLY_INSTALL_REQUIREMENTS'] || '') == '1'
+          only_install_requirements = true
+        else
+          only_install_requirements = false
+        end
+        if (ENV['SKIP_INSTALL_REQUIREMENTS'] || '') == '1'
+          skip_install_requirements = true
+        else
+          skip_install_requirements = false
+        end
+
+        if only_install_requirements and skip_install_requirements
+          error_msg = "The environment variables 'ONLY_INSTALL_REQUIREMENTS' and 'SKIP_INSTALL_REQUIREMENTS' cannot be both set to '1'"
+          error(error_msg)
+          raise ActionFailed, error_msg
+        end
+
         if only_download_artefacts
           info("[#{name}] Only downloading artefacts from instance #{instance.name} with state=#{state}")
         else
           info("[#{name}] Verify on instance #{instance.name} with state=#{state}")
+          if ENV['NOX_ENABLE_FROM_FILENAMES']
+            config[:enable_filenames] = true
+          end
+
+          if config[:enable_filenames] and ENV['CHANGE_TARGET'] and ENV['BRANCH_NAME'] and ENV['FORCE_FULL'] != 'true'
+            require 'git'
+            repo = Git.open(Dir.pwd)
+            config[:from_filenames] = repo.diff("origin/#{ENV['CHANGE_TARGET']}",
+                                                "origin/#{ENV['BRANCH_NAME']}").name_status.keys.select{|file| file.end_with?('.py')}
+            debug("Populating `from_filenames` with: #{config[:from_filenames]}")
+            if config[:windows] && config[:from_filenames].any?
+              # On windows, if the changed files list is too big, it will error.
+              # Let's then pass an absolute path to a text file which contains the list of changed
+              # files, one per line.
+              config[:from_filenames_path] = File.join(sandbox_path, config[:from_filenames_basename])
+              from_filenames_contents = "#{config[:from_filenames].join('\n')}"
+              File.open(config[:from_filenames_path], "w") { |f| f.write from_filenames_contents }
+              info("Created #{config[:from_filenames_path]} with contents:\n#{from_filenames_contents}")
+            end
+          end
         end
         root_path = (config[:windows] ? '%TEMP%\\kitchen' : '/tmp/kitchen')
         if ENV['KITCHEN_TESTS']
           ENV['KITCHEN_TESTS'].split(' ').each{|test| config[:tests].push(test)}
-        end
-
-        if ENV['NOX_ENABLE_FROM_FILENAMES']
-          config[:enable_filenames] = true
         end
 
         if ENV['NOX_PASSTHROUGH_OPTS']
@@ -81,6 +114,12 @@ module Kitchen
           noxenv = "pytest-zeromq"
         end
 
+        if noxenv.start_with?("test-")
+          config[:pytest_nox_session] = true
+        elsif noxenv.include?("pytest")
+          config[:pytest_nox_session] = true
+        end
+
         # Is the nox env already including the Python version?
         if not noxenv.match(/^(.*)-([\d]{1})(\.([\d]{1}))?$/)
           # Nox env's are not py<python-version> named, they just use the <python-version>
@@ -93,7 +132,7 @@ module Kitchen
         end
         noxenv = "#{noxenv}(coverage=#{config[:coverage] ? 'True' : 'False'})"
 
-        if noxenv.include? "pytest"
+        if config[:pytest_nox_session]
           tests = config[:tests].join(' ')
           if config[:sys_stats]
             sys_stats = '--sys-stats'
@@ -108,16 +147,9 @@ module Kitchen
           sys_stats = ''
         end
 
-        if config[:enable_filenames] and ENV['CHANGE_TARGET'] and ENV['BRANCH_NAME'] and ENV['FORCE_FULL'] != 'true'
-          require 'git'
-          repo = Git.open(Dir.pwd)
-          config[:from_filenames] = repo.diff("origin/#{ENV['CHANGE_TARGET']}",
-                                              "origin/#{ENV['BRANCH_NAME']}").name_status.keys.select{|file| file.end_with?('.py')}
-        end
-
         if config[:junitxml]
           junitxml = File.join(root_path, config[:testingdir], 'artifacts', 'xml-unittests-output')
-          if noxenv.include? "pytest"
+          if config[:pytest_nox_session]
             junitxml = "--junitxml=#{File.join(junitxml, "test-results-#{DateTime.now.strftime('%Y%m%d%H%M%S.%L')}.xml")}"
           else
             junitxml = "--xml=#{junitxml}"
@@ -137,7 +169,9 @@ module Kitchen
         command = [
           'nox',
           "-f #{File.join(root_path, config[:testingdir], 'noxfile.py')}",
+          (config[:windows] ? "--envdir=C:\\Windows\\Temp\\nox" : ""),
           (config[:windows] ? "-e #{noxenv}" : "-e '#{noxenv}'"),
+          (only_install_requirements ? "--install-only" : ""),
           '--',
           "--output-columns=#{config[:output_columns]}",
           sys_stats,
@@ -150,11 +184,19 @@ module Kitchen
 
         if tests.nil? || tests.empty?
           # If we're not targetting specific tests...
-          extra_command = [
-            (config[:from_filenames].any? ? "--from-filenames=#{config[:from_filenames].join(',')}" : ''),
-            (config[:windows] ? "--names-file=#{root_path}\\testing\\tests\\whitelist.txt" : ''),
-          ].join(' ')
-          command = "#{command} #{extra_command}"
+          extra_command = []
+          if config[:windows]
+            extra_command.push("--names-file=#{root_path}\\testing\\tests\\whitelist.txt")
+            if config[:from_filenames_path]
+                # Add the required command flag for the tests runner
+                extra_command.push("--from-filenames=#{root_path}\\testing\\#{config[:from_filenames_basename]}")
+            end
+          else
+            if config[:from_filenames].any?
+              extra_command.push("--from-filenames=#{config[:from_filenames].join(',')}")
+            end
+          end
+          command = "#{command} #{extra_command.join(' ')}"
         else
           command = "#{command} #{tests}"
         end
@@ -163,9 +205,15 @@ module Kitchen
         if ENV['CI'] || ENV['DRONE'] || ENV['JENKINS_URL']
           environment_vars['CI'] = 1
         end
+        if skip_install_requirements
+            environment_vars["SKIP_REQUIREMENTS_INSTALL"] = 1
+        end
         # Hash insert order matters, that's why we define a new one and merge
         # the one from config
         environment_vars.merge!(config[:environment_vars])
+
+        # Strip trailing whitespace
+        command = command.rstrip
 
         if config[:windows]
           command = "cmd.exe /c --% \"#{command}\" 2>&1"
@@ -194,6 +242,11 @@ module Kitchen
               end
             end
             if not only_download_artefacts
+              if config[:from_filenames_path]
+                upload_file_path = "$env:KitchenTestingDir\\#{config[:from_filenames_basename]}"
+                info("Uploading #{config[:from_filenames_path]} to #{upload_file_path} on #{instance.to_str}")
+                conn.upload(config[:from_filenames_path], "#{upload_file_path}")
+              end
               info("Running Command: #{command}")
               conn.execute(sudo(command))
             end
@@ -209,7 +262,7 @@ module Kitchen
                         info("7z.exe failed, attempting zip with powershell Compress-Archive")
                         conn.execute("powershell Compress-Archive #{remote} #{remote}artifacts.zip -Force")
                       rescue => e2
-                        error("Failed to create zip")
+                        error("Failed to create zip: #{e2}")
                       end
                     end
                   end
@@ -243,6 +296,8 @@ module Kitchen
         else
           debug("[#{name}] Verify completed.")
         end
+      ensure
+        cleanup_sandbox
       end
     end
   end
