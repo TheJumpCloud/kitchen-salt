@@ -68,7 +68,7 @@ def remote_functions(name):
     global remote_functions_data
     # FIXME(ppg): drive via configuration
     for file in glob.glob("/tmp/kitchen/srv/remote_functions/*"):
-        remote_functions_data.update(yaml.load(open(file)))
+        remote_functions_data.update(yaml.safe_load(open(file)))
 
     # Replacing __salt__['publish.publish'] is temporary until the modules are
     # refreshed, which happens after things like pkg.installed states; so instead let's
