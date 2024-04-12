@@ -96,8 +96,8 @@ then
     #{sudo('yum')} install #{salt_yum_repo_latest}
   else
     echo "-----> Installing yum repo for salt #{salt_version}"
-    #{sudo rm -f /etc/yum.repos.d/salt*}
-    #{sudo yum clean all}
+    #{sudo ('rm') -f /etc/yum.repos.d/salt*}
+    #{sudo ('yum') clean all}
     #{sudo('rpm')} --import '#{salt_yum_rpm_key}'
     #{sudo('tee')} /etc/yum.repos.d/saltstack.repo <<EOL
 [saltstack-repo]
