@@ -108,7 +108,7 @@ EOL
   fi
   #{sudo('yum')} clean all
   echo "-----> Installing salt-minion (#{salt_version})"
-  #{sudo('yum')} install -y salt*
+  #{sudo('yum')} install -y salt-minion salt-master
 fi
 
 # check again, now that an install of some form should have happened
