@@ -106,9 +106,9 @@ gpgcheck=1
 gpgkey=#{Shellwords.escape(salt_yum_repo_key)}
 EOL
   fi
-  #{sudo('yum')} clean expire-cache
+  #{sudo('yum')} clean all
   echo "-----> Installing salt-minion (#{salt_version})"
-  #{sudo('yum')} install -y salt-minion salt-common salt-master
+  #{sudo('yum')} install -y salt-minion salt-master
 fi
 
 # check again, now that an install of some form should have happened
