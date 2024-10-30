@@ -62,7 +62,7 @@ module Kitchen
         salt_apt_repo_key: 'https://repo.saltproject.io/apt/ubuntu/16.04/amd64/latest/SALTSTACK-GPG-KEY.pub',
         salt_apt_repo: 'https://repo.saltproject.io/apt/ubuntu/16.04/amd64',
         salt_bootstrap_options: '',
-        salt_bootstrap_url: 'https://bootstrap.saltproject.io',
+        salt_bootstrap_url: 'https://github.com/saltstack/salt-bootstrap/releases/latest/download/bootstrap-salt.sh',
         salt_config: '/etc/salt',
         salt_copy_filter: [],
         salt_env: 'base',
